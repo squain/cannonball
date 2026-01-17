@@ -5,7 +5,7 @@
 # Everything should go into a win64.cmake equivalent.
 # -----------------------------------------------------------------------------
 
-cmake_minimum_required (VERSION 3.3.2) # Might compile lower, but untested
+cmake_minimum_required (VERSION 3.5...3.31)
 project (cannonball)
 
 # -----------------------------------------------------------------------------
@@ -13,7 +13,14 @@ project (cannonball)
 # -----------------------------------------------------------------------------
 
 # CMake default file (override with -DTARGET=file)
-set(DCMAKE win64-opengl.cmake)
+# Auto-detect platform if TARGET not specified
+if(APPLE)
+    set(DCMAKE macos.cmake)
+elseif(UNIX)
+    set(DCMAKE linux.cmake)
+else()
+    set(DCMAKE win64-opengl.cmake)
+endif()
 
 # Source location
 set(main_cpp_base ../src/main)
@@ -255,7 +262,7 @@ message("SDL2 Libraries: ${SDL2_LIBRARIES}")
 # Include
 include_directories(
     ${main_cpp_base}
-    ${BOOST_INCLUDEDIR}
+    ${Boost_INCLUDE_DIRS}
     ${SDL2_INCLUDE_DIRS}
 )
 
