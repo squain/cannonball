@@ -53,7 +53,7 @@ jobs:
 
       - name: Install vcpkg packages
         run: |
-          vcpkg install sdl2:x64-windows boost-filesystem:x64-windows boost-system:x64-windows
+          vcpkg install sdl2:x64-windows boost:x64-windows
 
       - name: Build
         shell: pwsh
@@ -61,8 +61,5 @@ jobs:
           cd cmake
           New-Item -ItemType Directory -Force -Path build
           cd build
-          cmake -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-                -DVCPKG_TARGET_TRIPLET=x64-windows `
-                -DTARGET=win64-ci.cmake `
-                -G "Visual Studio 17 2022" -A x64 ..
+          cmake "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" "-DVCPKG_TARGET_TRIPLET=x64-windows" "-DTARGET=win64-ci.cmake" -G "Visual Studio 17 2022" -A x64 ..
           cmake --build . --config Release
