@@ -3,6 +3,7 @@
 # -----------------------------------------------------------------------------
 
 # Use OpenGL for rendering.
+set(OPENGL 1)
 find_package(OpenGL REQUIRED)
 
 # Platform Specific Libraries
