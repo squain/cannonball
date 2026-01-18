@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/squain/cannonball/compare/v1.0.0...v1.0.1) (2026-01-18)
+
+
+### Bug Fixes
+
+* use semantic-release-action for proper GitHub outputs ([bf9b8ef](https://github.com/squain/cannonball/commit/bf9b8ef762bf625ec5baaa89570eb4cf19888c2d))
+
 # 1.0.0 (2026-01-18)
 
 
