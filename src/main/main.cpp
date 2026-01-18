@@ -1,9 +1,13 @@
 /***************************************************************************
     Cannonball Main Entry Point.
-    
+
     Copyright Chris White.
     See license.txt for more details.
 ***************************************************************************/
+
+// Version information
+#define CANNONBALL_VERSION "0.35"
+#define CANNONBALL_YEAR    "2022"
 
 #include <cstring>
 #include <iostream>
@@ -263,26 +267,88 @@ static void main_loop()
     quit_func(0);
 }
 
-// Very (very) simple command line parser.
-// Returns true if everything is ok to proceed with launching th engine.
+static void print_version()
+{
+    std::cout << "Cannonball " << CANNONBALL_VERSION << std::endl;
+    std::cout << "An Enhanced OutRun Engine" << std::endl;
+    std::cout << "Copyright Chris White " << CANNONBALL_YEAR << std::endl;
+}
+
+static void print_usage(const char* program_name)
+{
+    print_version();
+    std::cout << std::endl;
+    std::cout << "Usage: " << program_name << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  -h, --help              Show this help message and exit" << std::endl;
+    std::cout << "  -v, --version           Show version information and exit" << std::endl;
+    std::cout << "  -c, --config <file>     Path to config.xml file" << std::endl;
+    std::cout << "                          (default: config.xml in current directory)" << std::endl;
+    std::cout << "  -t, --track <file>      Load custom track data from LayOut Editor" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Required Files:" << std::endl;
+    std::cout << "  roms/          Directory containing OutRun Rev B ROM files" << std::endl;
+    std::cout << "  res/           Directory with tilemap.bin, tilepatch.bin," << std::endl;
+    std::cout << "                 and gamecontrollerdb.txt" << std::endl;
+    std::cout << "  config.xml     Configuration file (created on first run)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << program_name << std::endl;
+    std::cout << "      Run with default settings" << std::endl;
+    std::cout << std::endl;
+    std::cout << "  " << program_name << " --config /path/to/config.xml" << std::endl;
+    std::cout << "      Run with a specific configuration file" << std::endl;
+    std::cout << std::endl;
+    std::cout << "  " << program_name << " --track mytrack.bin" << std::endl;
+    std::cout << "      Load a custom track from LayOut Editor" << std::endl;
+    std::cout << std::endl;
+    std::cout << "In-Game Controls:" << std::endl;
+    std::cout << "  ESC            Quit game" << std::endl;
+    std::cout << "  F1             Pause" << std::endl;
+    std::cout << "  F2             Frame step (when paused)" << std::endl;
+    std::cout << "  F3             Toggle menu" << std::endl;
+    std::cout << std::endl;
+    std::cout << "For more information, visit:" << std::endl;
+    std::cout << "  https://github.com/djyt/cannonball" << std::endl;
+}
+
+// Command line parser supporting both short and long options.
+// Returns true if everything is ok to proceed with launching the engine.
 static bool parse_command_line(int argc, char* argv[])
 {
-    for (int i = 0; i < argc; i++)
+    for (int i = 1; i < argc; i++)
     {
-        if (strcmp(argv[i], "-cfgfile") == 0 && i+1 < argc)
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0 ||
+            strcmp(argv[i], "-help") == 0 || strcmp(argv[i], "/?") == 0)
         {
-            config.set_config_file(argv[i+1]);
+            print_usage(argv[0]);
+            exit(0);
         }
-        else if (strcmp(argv[i], "-file") == 0 && i+1 < argc)
+        else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0 ||
+                 strcmp(argv[i], "-version") == 0)
         {
-            if (!trackloader.set_layout_track(argv[i+1]))
+            print_version();
+            exit(0);
+        }
+        else if ((strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--config") == 0 ||
+                  strcmp(argv[i], "-cfgfile") == 0) && i + 1 < argc)
+        {
+            config.set_config_file(argv[++i]);
+        }
+        else if ((strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--track") == 0 ||
+                  strcmp(argv[i], "-file") == 0) && i + 1 < argc)
+        {
+            if (!trackloader.set_layout_track(argv[++i]))
+            {
+                std::cerr << "Error: Failed to load track file: " << argv[i] << std::endl;
                 return false;
+            }
         }
-        else if (strcmp(argv[i], "-help") == 0)
+        else if (argv[i][0] == '-')
         {
-            std::cout << "Command Line Options:\n\n" <<
-                         "-cfgfile: Location and name of config.xml\n" <<
-                         "-file   : LayOut Editor track data to load\n" << std::endl;
+            std::cerr << "Error: Unknown option: " << argv[i] << std::endl;
+            std::cerr << "Try '" << argv[0] << " --help' for more information." << std::endl;
             return false;
         }
     }
