@@ -1,0 +1,183 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install semantic-release
+        run: npm install -g semantic-release @semantic-release/git @semantic-release/changelog @semantic-release/github
+
+      - name: Semantic Release
+        id: semantic
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+
+  build-linux:
+    needs: release
+    if: needs.release.outputs.new_release_published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.new_release_version }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libsdl2-dev \
+            libboost-dev \
+            libgl1-mesa-dev
+
+      - name: Build
+        run: |
+          cd cmake
+          mkdir build && cd build
+          cmake -DTARGET=linux.cmake ..
+          make -j$(nproc)
+
+      - name: Package
+        run: |
+          mkdir -p release/cannonball-linux
+          cp cmake/build/cannonball release/cannonball-linux/
+          cp cmake/build/config.xml release/cannonball-linux/
+          cp -r cmake/build/res release/cannonball-linux/
+          mkdir -p release/cannonball-linux/roms
+          echo "Place OutRun Rev B ROM files here" > release/cannonball-linux/roms/README.txt
+          cd release
+          tar -czvf cannonball-linux-x64.tar.gz cannonball-linux
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cannonball-linux-x64
+          path: release/cannonball-linux-x64.tar.gz
+
+  build-macos:
+    needs: release
+    if: needs.release.outputs.new_release_published == 'true'
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.new_release_version }}
+
+      - name: Install dependencies
+        run: |
+          brew install sdl2 boost cmake
+
+      - name: Build
+        run: |
+          cd cmake
+          mkdir build && cd build
+          cmake -DTARGET=macos.cmake ..
+          make -j$(sysctl -n hw.ncpu)
+
+      - name: Package
+        run: |
+          mkdir -p release/cannonball-macos
+          cp cmake/build/cannonball release/cannonball-macos/
+          cp cmake/build/config.xml release/cannonball-macos/
+          cp -r cmake/build/res release/cannonball-macos/
+          mkdir -p release/cannonball-macos/roms
+          echo "Place OutRun Rev B ROM files here" > release/cannonball-macos/roms/README.txt
+          cd release
+          zip -r cannonball-macos.zip cannonball-macos
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cannonball-macos
+          path: release/cannonball-macos.zip
+
+  build-windows:
+    needs: release
+    if: needs.release.outputs.new_release_published == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.new_release_version }}
+
+      - name: Install vcpkg packages
+        run: |
+          vcpkg install sdl2:x64-windows boost-filesystem:x64-windows boost-system:x64-windows
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cd cmake
+          New-Item -ItemType Directory -Force -Path build
+          cd build
+          cmake -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+                -DVCPKG_TARGET_TRIPLET=x64-windows `
+                -DTARGET=win64-ci.cmake `
+                -G "Visual Studio 17 2022" -A x64 ..
+          cmake --build . --config Release
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release/cannonball-windows
+          Copy-Item cmake/build/Release/cannonball.exe release/cannonball-windows/
+          Copy-Item cmake/build/config.xml release/cannonball-windows/
+          Copy-Item -Recurse cmake/build/res release/cannonball-windows/
+          New-Item -ItemType Directory -Force -Path release/cannonball-windows/roms
+          "Place OutRun Rev B ROM files here" | Out-File -FilePath release/cannonball-windows/roms/README.txt
+          Copy-Item "$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/bin/SDL2.dll" release/cannonball-windows/
+          cd release
+          Compress-Archive -Path cannonball-windows -DestinationPath cannonball-windows-x64.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cannonball-windows-x64
+          path: release/cannonball-windows-x64.zip
+
+  upload-assets:
+    needs: [release, build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.release.outputs.new_release_version }}
+          files: |
+            artifacts/cannonball-linux-x64/cannonball-linux-x64.tar.gz
+            artifacts/cannonball-macos/cannonball-macos.zip
+            artifacts/cannonball-windows-x64/cannonball-windows-x64.zip
